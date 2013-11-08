@@ -54,6 +54,12 @@ mvn -Ps4 package
 
 The deployable jars for SAMOA will be in `target/SAMOA-S4-0.0.1.jar`.
 
+###FPM branch
+```bash
+wget "http://www.philippe-fournier-viger.com/spmf/spmf.jar"
+mvn install:install-file -Dfile=spmf.jar -DgroupId=spmf -DartifactId=spmf -Dversion=1.0 -Dpackaging=jar
+```
+
 ## Documentation
 
 The documentation is intended to give an introduction on how to use SAMOA in the various different ways possible. 

@@ -1,6 +1,4 @@
-package com.yahoo.labs.samoa.core;
-
-import com.github.javacliparser.Configurable;
+package com.yahoo.labs.samoa.fpm.exceptions;
 
 /*
  * #%L
@@ -22,31 +20,28 @@ import com.github.javacliparser.Configurable;
  * #L%
  */
 
-/**
- * The Interface Processor.
- */
-public interface Processor extends java.io.Serializable, Configurable {
-	
-	/**
-	 * Process.
-	 *
-	 * @param event the event
-	 * @return true, if successful
-	 */
-	boolean process(ContentEvent event);
-	
-	/**
-	 * On create.
-	 *
-	 * @param id the id
-	 */
-	void onCreate(int id);
-	
-	/**
-	 * New processor.
-	 *
-	 * @param p the p
-	 * @return the processor
-	 */
-	Processor newProcessor(Processor p);
+public class OutOfRangeException extends IllegalArgumentException {
+
+	private final double value, min, max;
+
+	public OutOfRangeException(double value, double min, double max) {
+		super("Value " + value + " out of range " +
+				"[" + min + ".." + max + "]");
+		this.value = value;
+		this.min = min;
+		this.max = max;
+	}
+
+	public double getValue() {
+		return value;
+	}
+
+	public double getMin() {
+		return min;
+	}
+
+	public double getMax() {
+		return max;
+	}
+
 }

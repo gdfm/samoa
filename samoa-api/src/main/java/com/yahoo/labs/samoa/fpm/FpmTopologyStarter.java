@@ -1,6 +1,4 @@
-package com.yahoo.labs.samoa.core;
-
-import com.github.javacliparser.Configurable;
+package com.yahoo.labs.samoa.fpm;
 
 /*
  * #%L
@@ -22,31 +20,21 @@ import com.github.javacliparser.Configurable;
  * #L%
  */
 
-/**
- * The Interface Processor.
- */
-public interface Processor extends java.io.Serializable, Configurable {
+import com.yahoo.labs.samoa.core.TopologyStarter;
+
+public class FpmTopologyStarter implements TopologyStarter {
+
+	private ReaderInterface streamSource;
 	
-	/**
-	 * Process.
-	 *
-	 * @param event the event
-	 * @return true, if successful
-	 */
-	boolean process(ContentEvent event);
+	public FpmTopologyStarter(ReaderInterface s)
+	{
+		this.streamSource = s;
+	}
 	
-	/**
-	 * On create.
-	 *
-	 * @param id the id
-	 */
-	void onCreate(int id);
-	
-	/**
-	 * New processor.
-	 *
-	 * @param p the p
-	 * @return the processor
-	 */
-	Processor newProcessor(Processor p);
+	@Override
+	public void start() {
+		while(true)
+		streamSource.nextTuple();
+	}
+
 }

@@ -1,7 +1,5 @@
 package com.yahoo.labs.samoa.core;
 
-import com.github.javacliparser.Configurable;
-
 /*
  * #%L
  * SAMOA
@@ -22,31 +20,14 @@ import com.github.javacliparser.Configurable;
  * #L%
  */
 
-/**
- * The Interface Processor.
- */
-public interface Processor extends java.io.Serializable, Configurable {
+import java.io.Serializable;
+
+import com.github.javacliparser.Configurable;
+
+public interface EntranceProcessor extends Serializable, Configurable{
 	
-	/**
-	 * Process.
-	 *
-	 * @param event the event
-	 * @return true, if successful
-	 */
-	boolean process(ContentEvent event);
+	public void onCreate(int id);
 	
-	/**
-	 * On create.
-	 *
-	 * @param id the id
-	 */
-	void onCreate(int id);
-	
-	/**
-	 * New processor.
-	 *
-	 * @param p the p
-	 * @return the processor
-	 */
-	Processor newProcessor(Processor p);
+	public ContentEvent nextTuple();
+
 }
