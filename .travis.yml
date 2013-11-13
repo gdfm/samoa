@@ -9,6 +9,8 @@ install:
   - gradle s4-tools::installApp
   - cd ..
   - mvn install -DskipTests=true -B
+  - wget "http://www.philippe-fournier-viger.com/spmf/spmf.jar"
+  - mvn install:install-file -Dfile=spmf.jar -DgroupId=spmf -DartifactId=spmf -Dversion=1.0 -Dpackaging=jar
 
 script: "mvn -B -Pstorm,s4 test"
 
