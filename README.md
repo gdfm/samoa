@@ -52,7 +52,17 @@ cd samoa
 mvn -Ps4 package
 ```
 
-The deployable jars for SAMOA will be in `target/SAMOA-S4-0.0.1.jar`.
+###Local Test Mode
+
+If you want to test SAMOA in a local environment, simply clone the repository and install SAMOA.
+
+```bash
+git clone git@github.com:yahoo/samoa.git
+cd samoa
+mvn package
+```
+
+The deployable jar for SAMOA will be in `target/SAMOA-Local-0.0.1.jar`.
 
 ###FPM branch
 ```bash
@@ -64,6 +74,8 @@ mvn install:install-file -Dfile=spmf.jar -DgroupId=spmf -DartifactId=spmf -Dvers
 
 The documentation is intended to give an introduction on how to use SAMOA in the various different ways possible. 
 As a user you can use it to develop new algorithms and test different Stream Processing Engines.
+
+* [0 Getting Started in 5 minutes](../../wiki/Getting Started)
 
 * [1 Scalable Advanced Massive Online Analysis](../../wiki/Scalable Advanced Massive Online Analysis)
     * [1.0 Building SAMOA](../../wiki/Building SAMOA)
@@ -89,3 +101,4 @@ As a user you can use it to develop new algorithms and test different Stream Pro
 
 The use and distribution terms for this software are covered by the
 Apache License, Version 2.0 (http://www.apache.org/licenses/LICENSE-2.0.html).
+
