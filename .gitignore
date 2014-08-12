@@ -12,3 +12,6 @@ target/
 #intellij
 .idea/
 .iml
+
+#internal logging
+log/

@@ -81,8 +81,10 @@ final class ActiveLearningNode extends LearningNode {
 			this.thrownAwayInstance++;
 			return;
 		}
+		
 		this.observedClassDistribution.addToValue((int)inst.classValue(), 
 				inst.weight());
+		
 		//done: parallelize by sending attributes one by one
 		//TODO: meanwhile, we can try to use the ThreadPool to execute it separately
 		//TODO: parallelize by sending in batch, i.e. split the attributes into
@@ -177,7 +179,7 @@ final class ActiveLearningNode extends LearningNode {
 	
 	void endSplitting(){
 		this.isSplitting = false;
-		logger.trace("wasted instance: {}", this.thrownAwayInstance);
+		logger.debug("node: {}, thrown away instance: {}", this.id, this.thrownAwayInstance);
 		this.thrownAwayInstance = 0;
 	}
 	
