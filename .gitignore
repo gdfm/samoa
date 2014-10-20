@@ -15,3 +15,6 @@ target/
 
 #internal logging
 log/
+
+#samoa-api/build
+samoa-api/build

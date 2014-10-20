@@ -21,7 +21,11 @@ package com.yahoo.labs.samoa.learners.classifiers.trees;
  */
 
 import com.google.common.collect.ImmutableSet;
+
 import java.util.Set;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import com.github.javacliparser.ClassOption;
 import com.github.javacliparser.Configurable;
@@ -175,11 +179,15 @@ public final class VerticalHoeffdingTree implements ClassificationLearner, Adapt
 
   static class LearningNodeIdGenerator {
 
-    //TODO: add code to warn user of when value reaches Long.MAX_VALUES
-    private static long id = 0;
+        private static final Logger generatorLogger = LoggerFactory.getLogger(LearningNodeIdGenerator.class);
+        
+        //TODO: add code to warn user of when value reaches Long.MAX_VALUES
+        private static long id = 0;
 
-    static synchronized long generate() {
-      return id++;
+        static synchronized long generate() {
+            long theId = id++;
+            generatorLogger.debug("generating id: {}", theId);
+            return theId;
+        }
     }
   }
-}

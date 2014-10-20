@@ -116,7 +116,7 @@ final class ModelAggregatorProcessor implements Processor {
 		InstancesHeader ih = new InstancesHeader(dataset);
 		this.setModelContext(ih);
 	}
-
+       
 	@Override
 	public boolean process(ContentEvent event) {
 		
@@ -159,8 +159,8 @@ final class ModelAggregatorProcessor implements Processor {
                                     } 
                                 }
                             }
-                        }
-                        this.foundNodeSet = null;
+            }
+            this.foundNodeSet = null;
 		} else if(event instanceof LocalResultContentEvent){
 			LocalResultContentEvent lrce = (LocalResultContentEvent) event;
 			Long lrceSplitId = lrce.getSplitId();
@@ -274,92 +274,95 @@ final class ModelAggregatorProcessor implements Processor {
 	private List<InstancesContentEvent> contentEventList = new LinkedList<>();
 
         
-	/**
-	 * Helper method to process the InstanceContentEvent
-	 * @param instContentEvent
-	 */
-	private void processInstanceContentEvent(InstancesContentEvent instContentEvent){
-            this.numBatches++;
-            this.contentEventList.add(instContentEvent);
-            if (this.numBatches == 1 || this.numBatches > 4){
-                this.processInstances(this.contentEventList.remove(0));
-            }
-
+    /**
+     * Helper method to process the InstanceContentEvent
+     * 
+     * @param instContentEvent
+     */
+    private void processInstanceContentEvent(
+            InstancesContentEvent instContentEvent) {
+        this.numBatches++;
+        logger.debug("Num batches: {}", numBatches);
+        this.contentEventList.add(instContentEvent);
+        if (this.numBatches == 1 || this.numBatches > 4) {
+            this.processInstances(this.contentEventList.remove(0));
+        }
             if (instContentEvent.isLastEvent()) {
                 // drain remaining instances
                 while (!contentEventList.isEmpty()) {
                     processInstances(contentEventList.remove(0));
                 }
             }
-                
-        }
-        
-        private int numBatches = 0;
-                    
-        private void processInstances(InstancesContentEvent instContentEvent){
-         
-            Instance[] instances = instContentEvent.getInstances();
-            boolean isTesting = instContentEvent.isTesting();
-            boolean isTraining= instContentEvent.isTraining();
-            for (Instance inst: instances){
-                this.processInstance(inst,instContentEvent, isTesting, isTraining);
-            }
-        }
-        
-         private void processInstance(Instance inst, InstancesContentEvent instContentEvent, boolean isTesting, boolean isTraining){
-                inst.setDataset(this.dataset);
-		//Check the instance whether it is used for testing or training
-                //boolean testAndTrain = isTraining; //Train after testing
-		double[] prediction = null;
-		if (isTesting) {
-                        prediction = getVotesForInstance(inst, false);
-			this.resultStream.put(newResultContentEvent(prediction, inst,
-					instContentEvent));
-		}
+    }
 
-		if (isTraining) {
-			trainOnInstanceImpl(inst);
-                        if (this.changeDetector != null) {
-                            if (prediction == null) {
-                                prediction = getVotesForInstance(inst);
-                            }
-                            boolean correctlyClassifies = this.correctlyClassifies(inst,prediction);
-                            double oldEstimation = this.changeDetector.getEstimation();
-                            this.changeDetector.input(correctlyClassifies ? 0 : 1);
-                            if (this.changeDetector.getEstimation() > oldEstimation) {
-                                //Start a new classifier
-                                logger.info("Change detected, resetting the classifier");
-                                this.resetLearning();
-                                this.changeDetector.resetLearning();
-                            }
-                    }
-		}
-	}
-	
-        private boolean correctlyClassifies(Instance inst, double[] prediction) {
-            return maxIndex(prediction) == (int) inst.classValue();
+    private int numBatches = 0;
+
+    private void processInstances(InstancesContentEvent instContentEvent) {
+
+        Instance[] instances = instContentEvent.getInstances();
+        boolean isTesting = instContentEvent.isTesting();
+        boolean isTraining = instContentEvent.isTraining();
+        for (Instance inst : instances) {
+            this.processInstance(inst, instContentEvent, isTesting, isTraining);
         }
-        
-        private void resetLearning() {
-            this.treeRoot = null;
-            //Remove nodes
-            FoundNode[] learningNodes = findNodes();
-            for (FoundNode learningNode : learningNodes) {
-                Node node = learningNode.getNode();
-                if (node instanceof SplitNode) {
-                    SplitNode splitNode;
-                    splitNode = (SplitNode) node;
-                    for (int i = 0; i < splitNode.numChildren(); i++) {
-                        splitNode.setChild(i, null);
-                    }
+    }
+
+    private void processInstance(Instance inst,
+            InstancesContentEvent instContentEvent, boolean isTesting,
+            boolean isTraining) {
+        inst.setDataset(this.dataset);
+        // Check the instance whether it is used for testing or training
+        double[] prediction = null;
+        if (isTesting) {
+            prediction = getVotesForInstance(inst, false);
+            this.resultStream.put(newResultContentEvent(prediction, inst,
+                    instContentEvent));
+        }
+
+        if (isTraining) {
+            trainOnInstanceImpl(inst);
+            if (this.changeDetector != null) {
+                if (prediction == null) {
+                    prediction = getVotesForInstance(inst);
+                }
+                boolean correctlyClassifies = this.correctlyClassifies(inst,
+                        prediction);
+                double oldEstimation = this.changeDetector.getEstimation();
+                this.changeDetector.input(correctlyClassifies ? 0 : 1);
+                if (this.changeDetector.getEstimation() > oldEstimation) {
+                    // Start a new classifier
+                    logger.info("Change detected, resetting the classifier");
+                    this.resetLearning();
+                    this.changeDetector.resetLearning();
                 }
             }
         }
-	
-        protected FoundNode[] findNodes() {
+    }
+
+    private boolean correctlyClassifies(Instance inst, double[] prediction) {
+        return maxIndex(prediction) == (int) inst.classValue();
+    }
+
+    private void resetLearning() {
+        this.treeRoot = null;
+        // Remove nodes
+        FoundNode[] learningNodes = findNodes();
+        for (FoundNode learningNode : learningNodes) {
+            Node node = learningNode.getNode();
+            if (node instanceof SplitNode) {
+                SplitNode splitNode;
+                splitNode = (SplitNode) node;
+                for (int i = 0; i < splitNode.numChildren(); i++) {
+                    splitNode.setChild(i, null);
+                }
+            }
+        }
+    }
+
+    protected FoundNode[] findNodes() {
         List<FoundNode> foundList = new LinkedList<>();
         findNodes(this.treeRoot, null, -1, foundList);
-        return foundList.toArray(new FoundNode[foundList.size()]);
+  return foundList.toArray(new FoundNode[foundList.size()]);
     }
 
     protected void findNodes(Node node, SplitNode parent,
@@ -383,38 +386,38 @@ final class ModelAggregatorProcessor implements Processor {
 	 * @param inst
 	 * @return
 	 */
-	private double[] getVotesForInstance(Instance inst){
-            return getVotesForInstance(inst, false);
+    private double[] getVotesForInstance(Instance inst) {
+        return getVotesForInstance(inst, false);
+    }
+
+    private double[] getVotesForInstance(Instance inst, boolean isTraining) {
+        double[] ret = null;
+        FoundNode foundNode = null;
+        if (this.treeRoot != null) {
+            foundNode = this.treeRoot.filterInstanceToLeaf(inst, null, -1);
+            Node leafNode = foundNode.getNode();
+            if (leafNode == null) {
+                leafNode = foundNode.getParent();
+            }
+
+            ret = leafNode.getClassVotes(inst, this);
+        } else {
+            int numClasses = this.dataset.numClasses();
+            ret = new double[numClasses];
+
         }
-            
-	private double[] getVotesForInstance(Instance inst, boolean isTraining){
-		double[] ret;
-		FoundNode foundNode = null;
-		if(this.treeRoot != null){
-			foundNode = this.treeRoot.filterInstanceToLeaf(inst, null, -1);
-			Node leafNode = foundNode.getNode();
-			if(leafNode == null){
-				leafNode = foundNode.getParent();
-			}
-			
-			ret = leafNode.getClassVotes(inst, this);
-		} else {
-			int numClasses = this.dataset.numClasses();
-			ret = new double[numClasses];
-                        
-		}
-                
-    //Training after testing to speed up the process
-		if (isTraining){
-			if(this.treeRoot == null){
-				this.treeRoot = newLearningNode(this.parallelismHint);
-        this.activeLeafNodeCount = 1;
-        foundNode = this.treeRoot.filterInstanceToLeaf(inst, null, -1);
-			}
-			trainOnInstanceImpl(foundNode, inst);
-		}
-		return ret;
-	}
+
+        // Training after testing to speed up the process
+        if (isTraining == true) {
+            if (this.treeRoot == null) {
+                this.treeRoot = newLearningNode(this.parallelismHint);
+                this.activeLeafNodeCount = 1;
+                foundNode = this.treeRoot.filterInstanceToLeaf(inst, null, -1);
+            }
+            trainOnInstanceImpl(foundNode, inst);
+        }
+        return ret;
+    }
 	
 	/**
 	 * Helper method that represent training of an instance. Since it is decision tree, 
@@ -422,35 +425,50 @@ final class ModelAggregatorProcessor implements Processor {
 	 * statistic on the found leaf. 
 	 * @param inst
 	 */
-	private void trainOnInstanceImpl(Instance inst) {
-		if(this.treeRoot == null){
-			this.treeRoot = newLearningNode(this.parallelismHint);
-			this.activeLeafNodeCount = 1;
-                        
-		}
-		FoundNode foundNode = this.treeRoot.filterInstanceToLeaf(inst, null, -1);
-                trainOnInstanceImpl(foundNode, inst);
+    private void trainOnInstanceImpl(Instance inst) {
+        if (this.treeRoot == null) {
+            this.treeRoot = newLearningNode(this.parallelismHint);
+            this.activeLeafNodeCount = 1;
+
         }
-		
-         private void trainOnInstanceImpl(FoundNode foundNode, Instance inst) {
-                
-		Node leafNode = foundNode.getNode();
-		
-		if(leafNode == null){
-			leafNode = newLearningNode(this.parallelismHint);
-			foundNode.getParent().setChild(foundNode.getParentBranch(), leafNode);
-			activeLeafNodeCount++;
-		}
-		
-		if(leafNode instanceof LearningNode){
-			LearningNode learningNode = (LearningNode) leafNode;
-			learningNode.learnFromInstance(inst, this);
-		}
-					 if (this.foundNodeSet == null){
-                    this.foundNodeSet = new HashSet<>();
-		}
-                this.foundNodeSet.add(foundNode);
-	}
+        FoundNode foundNode = this.treeRoot
+                .filterInstanceToLeaf(inst, null, -1);
+        trainOnInstanceImpl(foundNode, inst);
+    }
+
+    private void trainOnInstanceImpl(FoundNode foundNode, Instance inst) {
+
+        Node leafNode = foundNode.getNode();
+
+        if (leafNode == null) {
+            leafNode = newLearningNode(this.parallelismHint);
+            foundNode.getParent().setChild(foundNode.getParentBranch(),
+                    leafNode);
+            activeLeafNodeCount++;
+        }
+
+        if (leafNode instanceof LearningNode) {
+            LearningNode learningNode = (LearningNode) leafNode;
+            learningNode.learnFromInstance(inst, this);
+
+            /*
+             * if(this.growthAllowed && (learningNode instanceof
+             * ActiveLearningNode)){ ActiveLearningNode activeLearningNode =
+             * (ActiveLearningNode) learningNode; //at the moment, throw away
+             * the instances when the node is splitting
+             * if(activeLearningNode.isSpliting()){ return; } double weightSeen
+             * = activeLearningNode.getWeightSeen(); //check whether it is the
+             * time for splitting if(weightSeen -
+             * activeLearningNode.getWeightSeenAtLastSplitEvaluation() >=
+             * this.gracePeriod){ attemptToSplit(activeLearningNode, foundNode);
+             * } }
+             */
+        }
+        if (this.foundNodeSet == null) {
+            this.foundNodeSet = new HashSet<FoundNode>();
+        }
+        this.foundNodeSet.add(foundNode);
+    }
 	
 	/**
 	 * Helper method to represent a split attempt

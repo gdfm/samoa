@@ -65,6 +65,7 @@
   
   <root>
     <priority value="warn" />
+    <appender-ref ref="CONSOLE"/>
     <appender-ref ref="RollingAppender"/>
   </root>
 </log4j:configuration>

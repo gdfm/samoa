@@ -58,7 +58,6 @@ import com.yahoo.labs.samoa.topology.TopologyBuilder;
 public class PrequentialEvaluation implements Task, Configurable {
 
     private static final long serialVersionUID = -8246537378371580550L;
-
     private static Logger logger = LoggerFactory.getLogger(PrequentialEvaluation.class);
 
     public ClassOption learnerOption = new ClassOption("learner", 'l', "Classifier to train.", Learner.class, VerticalHoeffdingTree.class.getName());
@@ -89,23 +88,10 @@ public class PrequentialEvaluation implements Task, Configurable {
     public IntOption batchDelayOption = new IntOption("delayBatchSize", 'b', "The delay batch size: delay of x milliseconds after each batch ", 1, 1, Integer.MAX_VALUE);
     
     private PrequentialSourceProcessor preqSource;
-
-    // private PrequentialSourceTopologyStarter preqStarter;
-
-    // private EntranceProcessingItem sourcePi;
-
     private Stream sourcePiOutputStream;
-
     private Learner classifier;
-
     private EvaluatorProcessor evaluator;
-
-    // private ProcessingItem evaluatorPi;
-
-    // private Stream evaluatorPiInputStream;
-
     private Topology prequentialTopology;
-
     private TopologyBuilder builder;
 
     public void getDescription(StringBuilder sb, int indent) {
@@ -136,12 +122,7 @@ public class PrequentialEvaluation implements Task, Configurable {
         builder.addEntranceProcessor(preqSource);
         logger.debug("Successfully instantiating PrequentialSourceProcessor");
 
-        // preqStarter = new PrequentialSourceTopologyStarter(preqSource, instanceLimitOption.getValue());
-        // sourcePi = builder.createEntrancePi(preqSource, preqStarter);
-        // sourcePiOutputStream = builder.createStream(sourcePi);
-
         sourcePiOutputStream = builder.createStream(preqSource);
-        // preqStarter.setInputStream(sourcePiOutputStream);
 
         // instantiate classifier and connect it to sourcePiOutputStream
         classifier = this.learnerOption.getValue();
@@ -156,8 +137,6 @@ public class PrequentialEvaluation implements Task, Configurable {
         evaluator = new EvaluatorProcessor.Builder(evaluatorOptionValue)
                 .samplingFrequency(sampleFrequencyOption.getValue()).dumpFile(dumpFileOption.getFile()).build();
 
-        // evaluatorPi = builder.createPi(evaluator);
-        // evaluatorPi.connectInputShuffleStream(evaluatorPiInputStream);
         builder.addProcessor(evaluator);
         for (Stream evaluatorPiInputStream:classifier.getResultStreams()) {
         	builder.connectInputShuffleStream(evaluatorPiInputStream, evaluator);
@@ -185,11 +164,6 @@ public class PrequentialEvaluation implements Task, Configurable {
     public Topology getTopology() {
         return prequentialTopology;
     }
-    //
-    // @Override
-    // public TopologyStarter getTopologyStarter() {
-    // return this.preqStarter;
-    // }
     
     private static boolean isLearnerAndEvaluatorCompatible(Learner learner, PerformanceEvaluator evaluator) {
         return (learner instanceof RegressionLearner && evaluator instanceof RegressionPerformanceEvaluator) ||
