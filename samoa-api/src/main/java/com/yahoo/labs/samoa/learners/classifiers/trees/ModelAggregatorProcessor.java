@@ -123,12 +123,13 @@ final class ModelAggregatorProcessor implements Processor {
 		//Poll the blocking queue shared between ModelAggregator and the time-out threads
 		Long timedOutSplitId = timedOutSplittingNodes.poll();
 		if(timedOutSplitId != null){ //time out has been reached!
+		    logger.debug("time out has been reached. time out id: {}", timedOutSplitId);
 			SplittingNodeInfo splittingNode = splittingNodes.get(timedOutSplitId);
 			if (splittingNode != null) {
+			    logger.debug("node: {}. splitting node info in timeout!", splittingNode.activeLearningNode.getId());
 				this.splittingNodes.remove(timedOutSplitId);
 				this.continueAttemptToSplit(splittingNode.activeLearningNode,
 						splittingNode.foundNode);
-			
 			}
 
 		}
@@ -176,11 +177,16 @@ final class ModelAggregatorProcessor implements Processor {
 						lrce.getSecondBestSuggestion());
 
 				if (activeLearningNode.isAllSuggestionsCollected()) {
+	                logger.debug("node: {}. all suggestions are collected!", activeLearningNode.getId());
 					splittingNodeInfo.scheduledFuture.cancel(false);
 					this.splittingNodes.remove(lrceSplitId);
 					this.continueAttemptToSplit(activeLearningNode,
 							splittingNodeInfo.foundNode);
+				} else {
+                    logger.debug("node: {}. NOT all suggestions are collected!", activeLearningNode.getId());
 				}
+				
+				
 			}
 		}
 		return false;
@@ -282,7 +288,7 @@ final class ModelAggregatorProcessor implements Processor {
     private void processInstanceContentEvent(
             InstancesContentEvent instContentEvent) {
         this.numBatches++;
-        logger.debug("Num batches: {}", numBatches);
+//        logger.debug("Num batches: {}", numBatches);
         this.contentEventList.add(instContentEvent);
         if (this.numBatches == 1 || this.numBatches > 4) {
             this.processInstances(this.contentEventList.remove(0));
@@ -501,7 +507,8 @@ final class ModelAggregatorProcessor implements Processor {
 	 * tree model.
 	 */
 	private void continueAttemptToSplit(ActiveLearningNode activeLearningNode, FoundNode foundNode){
-		AttributeSplitSuggestion bestSuggestion = activeLearningNode.getDistributedBestSuggestion();
+	    logger.debug("node: {}. continue attempt to split", activeLearningNode.getId());
+	    AttributeSplitSuggestion bestSuggestion = activeLearningNode.getDistributedBestSuggestion();
 		AttributeSplitSuggestion secondBestSuggestion = activeLearningNode.getDistributedSecondBestSuggestion();
 		
 		//compare with null split
@@ -541,11 +548,14 @@ final class ModelAggregatorProcessor implements Processor {
 		int parentBranch = foundNode.getParentBranch();
 		
 		//split if the Hoeffding bound condition is satisfied
+		logger.debug("node: {}. shouldSplit: {}", activeLearningNode.getId(), shouldSplit);
 		if(shouldSplit){
-
-			if (bestSuggestion.splitTest != null) {
+			if(bestSuggestion.splitTest == null){
+			    logger.debug("node: {}. split test is null! null attribute is winning", activeLearningNode.getId()); //shoud we deactivate here
+				// null attribute wins
+			}else{
 				SplitNode newSplit = new SplitNode(bestSuggestion.splitTest, activeLearningNode.getObservedClassDistribution());
-
+				
 				for(int i = 0; i < bestSuggestion.numSplits(); i++){
 					Node newChild = newLearningNode(bestSuggestion.resultingClassDistributionFromSplit(i), this.parallelismHint);
 					newSplit.setChild(i, newChild);
@@ -562,6 +572,7 @@ final class ModelAggregatorProcessor implements Processor {
 				}
 			}
 			//TODO: add check on the model's memory size 
+		} else {
 		}
 		
 		//housekeeping

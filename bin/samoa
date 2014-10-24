@@ -206,7 +206,7 @@ elif [ $PLATFORM = 'STORM' ]; then
 		#use this line below for Storm 0.9.x
 		#STORM_JAR=$(ls $STORM_HOME/storm-core*.jar)
 		CLASSPATH="$CLASSPATH:$STORM_HOME/lib/*:$STORM_JAR:$DEPLOYABLE"
-  		java $JAVA_OPTS -cp $CLASSPATH com.yahoo.labs.samoa.LocalStormDoTask $COMPLETE_ARG $NUM_WORKER
+    java $JAVA_OPTS -cp $CLASSPATH com.yahoo.labs.samoa.LocalStormDoTask $COMPLETE_ARG $NUM_WORKER
 	fi
 
 elif [ $PLATFORM = 'SAMZA' ]; then

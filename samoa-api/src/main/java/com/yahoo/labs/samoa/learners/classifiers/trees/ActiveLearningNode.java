@@ -140,6 +140,7 @@ final class ActiveLearningNode extends LearningNode {
 	}
 	
 	void requestDistributedSuggestions(long splitId, ModelAggregatorProcessor modelAggrProc) {
+	    logger.debug("node: {}. start splitting", this.id);
 		this.isSplitting = true; 
 		this.suggestionCtr = 0;
 		this.thrownAwayInstance = 0;
@@ -179,7 +180,7 @@ final class ActiveLearningNode extends LearningNode {
 	
 	void endSplitting(){
 		this.isSplitting = false;
-		logger.debug("node: {}, thrown away instance: {}", this.id, this.thrownAwayInstance);
+		logger.debug("node: {}. end splitting, thrown away instance: {}", this.id, this.thrownAwayInstance);
 		this.thrownAwayInstance = 0;
 	}
 	
