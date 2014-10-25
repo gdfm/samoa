@@ -36,6 +36,7 @@ import com.yahoo.labs.samoa.core.Processor;
 import com.yahoo.labs.samoa.instances.Instances;
 import com.yahoo.labs.samoa.learners.AdaptiveLearner;
 import com.yahoo.labs.samoa.learners.ClassificationLearner;
+import com.yahoo.labs.samoa.learners.classifiers.trees.ActiveLearningNode.SplittingOption;
 import com.yahoo.labs.samoa.moa.classifiers.core.attributeclassobservers.AttributeClassObserver;
 import com.yahoo.labs.samoa.moa.classifiers.core.attributeclassobservers.DiscreteAttributeClassObserver;
 import com.yahoo.labs.samoa.moa.classifiers.core.attributeclassobservers.NumericAttributeClassObserver;
@@ -55,77 +56,104 @@ import com.yahoo.labs.samoa.topology.TopologyBuilder;
  */
 public final class VerticalHoeffdingTree implements ClassificationLearner, AdaptiveLearner, Configurable {
 
-  private static final long serialVersionUID = -4937416312929984057L;
+    private static final long serialVersionUID = -4937416312929984057L;
 
-  public ClassOption numericEstimatorOption = new ClassOption("numericEstimator",
-      'n', "Numeric estimator to use.", NumericAttributeClassObserver.class,
-      "GaussianNumericAttributeClassObserver");
+    public ClassOption numericEstimatorOption = new ClassOption("numericEstimator",
+            'n', "Numeric estimator to use.", NumericAttributeClassObserver.class,
+            "GaussianNumericAttributeClassObserver");
 
-  public ClassOption nominalEstimatorOption = new ClassOption("nominalEstimator",
-      'd', "Nominal estimator to use.", DiscreteAttributeClassObserver.class,
-      "NominalAttributeClassObserver");
+    public ClassOption nominalEstimatorOption = new ClassOption("nominalEstimator",
+            'd', "Nominal estimator to use.", DiscreteAttributeClassObserver.class,
+            "NominalAttributeClassObserver");
 
-  public ClassOption splitCriterionOption = new ClassOption("splitCriterion",
-      's', "Split criterion to use.", SplitCriterion.class,
-      "InfoGainSplitCriterion");
+    public ClassOption splitCriterionOption = new ClassOption("splitCriterion",
+            's', "Split criterion to use.", SplitCriterion.class,
+            "InfoGainSplitCriterion");
 
-  public FloatOption splitConfidenceOption = new FloatOption(
-      "splitConfidence",
-      'c',
-      "The allowable error in split decision, values closer to 0 will take longer to decide.",
-      0.0000001, 0.0, 1.0);
+    public FloatOption splitConfidenceOption = new FloatOption(
+            "splitConfidence",
+            'c',
+            "The allowable error in split decision, values closer to 0 will take longer to decide.",
+            0.0000001, 0.0, 1.0);
 
-  public FloatOption tieThresholdOption = new FloatOption("tieThreshold",
-      't', "Threshold below which a split will be forced to break ties.",
-      0.05, 0.0, 1.0);
+    public FloatOption tieThresholdOption = new FloatOption("tieThreshold",
+            't', "Threshold below which a split will be forced to break ties.",
+            0.05, 0.0, 1.0);
 
-  public IntOption gracePeriodOption = new IntOption(
-      "gracePeriod",
-      'g',
-      "The number of instances a leaf should observe between split attempts.",
-      200, 0, Integer.MAX_VALUE);
+    public IntOption gracePeriodOption = new IntOption(
+            "gracePeriod",
+            'g',
+            "The number of instances a leaf should observe between split attempts.",
+            200, 0, Integer.MAX_VALUE);
 
-  public IntOption parallelismHintOption = new IntOption(
-      "parallelismHint",
-      'p',
-      "The number of local statistics PI to do distributed computation",
-      1, 1, Integer.MAX_VALUE);
+    public IntOption parallelismHintOption = new IntOption(
+            "parallelismHint",
+            'p',
+            "The number of local statistics PI to do distributed computation",
+            1, 1, Integer.MAX_VALUE);
 
-  public IntOption timeOutOption = new IntOption(
-      "timeOut",
-      'o',
-      "The duration to wait all distributed computation results from local statistics PI",
-      30, 1, Integer.MAX_VALUE);
+    public IntOption timeOutOption = new IntOption(
+            "timeOut",
+            'o',
+            "The duration to wait all distributed computation results from local statistics PI",
+            30, 1, Integer.MAX_VALUE);
 
-  public FlagOption binarySplitsOption = new FlagOption("binarySplits", 'b',
-      "Only allow binary splits.");
+    public FlagOption binarySplitsOption = new FlagOption("binarySplits", 'b',
+            "Only allow binary splits.");
+    
+    public FlagOption splittingOption = new FlagOption(
+            "keepInstanceWhileSplitting",
+            'k',
+            "Keep instance while splitting (without buffer)");
+    
+    //TODO: (possible)
+    //1. memoryEstimatedOption => for estimating model sizes
+    //2. binarySplitsOption => for getting the best split suggestion, must be set in LocalStatisticsProcessor
+    //3. stopMemManagementOption => for enforcing tracker limit, no tracker limit enforcement atm
+    //4. removePoorAttsOption => no poor attributes remove at the moment
+    //5. noPrePruneOption => always add null split as an option now
+    private ModelAggregatorProcessor modelAggrProc;
 
-  private Stream resultStream;
+    private Stream resultStream;
 
-  private FilterProcessor filterProc;
+    private Stream attributeStream;
 
-  @Override
-  public void init(TopologyBuilder topologyBuilder, Instances dataset, int parallelism) {
+    private Stream controlStream;
 
-    this.filterProc = new FilterProcessor.Builder(dataset)
-        .build();
-    topologyBuilder.addProcessor(filterProc, parallelism);
+    private LocalStatisticsProcessor locStatProc;
 
-    Stream filterStream = topologyBuilder.createStream(filterProc);
-    this.filterProc.setOutputStream(filterStream);
+    private FilterProcessor filterProc;
+    
+    private Stream filterStream;
+    
+    private Stream computeStream;
+    
+//    private int parallelism;
 
-
-    ModelAggregatorProcessor modelAggrProc = new ModelAggregatorProcessor.Builder(dataset)
-        .splitCriterion((SplitCriterion) this.splitCriterionOption.getValue())
-        .splitConfidence(splitConfidenceOption.getValue())
-        .tieThreshold(tieThresholdOption.getValue())
-        .gracePeriod(gracePeriodOption.getValue())
-        .parallelismHint(parallelismHintOption.getValue())
-        .timeOut(timeOutOption.getValue())
-        .changeDetector(this.getChangeDetector())
-        .build();
-
-    topologyBuilder.addProcessor(modelAggrProc, parallelism);
+    @Override
+    public void init(TopologyBuilder topologyBuilder, Instances dataset, int parallelism) {
+//        this.parallelism = parallelism;
+        
+        this.filterProc = new FilterProcessor.Builder(dataset)
+                .build();
+        topologyBuilder.addProcessor(filterProc, parallelism);
+        
+        this.filterStream = topologyBuilder.createStream(filterProc);
+        this.filterProc.setOutputStream(this.filterStream);
+         
+ 
+        this.modelAggrProc = new ModelAggregatorProcessor.Builder(dataset)
+                .splitCriterion((SplitCriterion) this.splitCriterionOption.getValue())
+                .splitConfidence(splitConfidenceOption.getValue())
+                .tieThreshold(tieThresholdOption.getValue())
+                .gracePeriod(gracePeriodOption.getValue())
+                .parallelismHint(parallelismHintOption.getValue())
+                .timeOut(timeOutOption.getValue())
+                .changeDetector(this.getChangeDetector())
+                .splittingOption(splittingOption.isSet() ? SplittingOption.KEEP_WO_BUFFER: SplittingOption.THROW_AWAY)
+                .build();
+        
+        topologyBuilder.addProcessor(modelAggrProc, parallelism);
 
     topologyBuilder.connectInputShuffleStream(filterStream, modelAggrProc);
 

@@ -19,10 +19,11 @@ package com.yahoo.labs.samoa.learners.classifiers.trees;
  * limitations under the License.
  * #L%
  */
-
 import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Queue;
+import java.util.Random;
 import java.util.Set;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.ConcurrentHashMap;
@@ -41,13 +42,14 @@ import com.yahoo.labs.samoa.core.Processor;
 import com.yahoo.labs.samoa.instances.Instance;
 import com.yahoo.labs.samoa.instances.Instances;
 import com.yahoo.labs.samoa.instances.InstancesHeader;
-import com.yahoo.labs.samoa.learners.InstanceContentEvent;
 import com.yahoo.labs.samoa.learners.InstancesContentEvent;
 import com.yahoo.labs.samoa.learners.ResultContentEvent;
+import com.yahoo.labs.samoa.learners.classifiers.trees.ActiveLearningNode.SplittingOption;
 import com.yahoo.labs.samoa.moa.classifiers.core.AttributeSplitSuggestion;
 import com.yahoo.labs.samoa.moa.classifiers.core.driftdetection.ChangeDetector;
 import com.yahoo.labs.samoa.moa.classifiers.core.splitcriteria.InfoGainSplitCriterion;
 import com.yahoo.labs.samoa.moa.classifiers.core.splitcriteria.SplitCriterion;
+import com.yahoo.labs.samoa.moa.core.MiscUtils;
 import com.yahoo.labs.samoa.topology.Stream;
 
 import static com.yahoo.labs.samoa.moa.core.Utils.maxIndex;
@@ -101,6 +103,7 @@ final class ModelAggregatorProcessor implements Processor {
 	private final int gracePeriod;
 	private final int parallelismHint;
 	private final long timeOut;
+	private final SplittingOption splittingOption;
 	
 	//private constructor based on Builder pattern
 	private ModelAggregatorProcessor(Builder builder){
@@ -111,8 +114,9 @@ final class ModelAggregatorProcessor implements Processor {
 		this.gracePeriod = builder.gracePeriod;
 		this.parallelismHint = builder.parallelismHint;
 		this.timeOut = builder.timeOut;
-		this.changeDetector = builder.changeDetector;
-
+        this.changeDetector = builder.changeDetector;
+        this.splittingOption = builder.splittingOption;
+        
 		InstancesHeader ih = new InstancesHeader(dataset);
 		this.setModelContext(ih);
 	}
@@ -262,13 +266,13 @@ final class ModelAggregatorProcessor implements Processor {
 	 * @param inEvent The associated instance content event
 	 * @return ResultContentEvent to be sent into Evaluator PI or other destination PI.
 	 */
-	private ResultContentEvent newResultContentEvent(double[] prediction, InstanceContentEvent inEvent){
-		ResultContentEvent rce = new ResultContentEvent(inEvent.getInstanceIndex(), inEvent.getInstance(),
-				inEvent.getClassId(), prediction, inEvent.isLastEvent());
-		rce.setClassifierIndex(this.processorId);
-		rce.setEvaluationIndex(inEvent.getEvaluationIndex());
-		return rce;
-	}
+//	private ResultContentEvent newResultContentEvent(double[] prediction, InstanceContentEvent inEvent){
+//		ResultContentEvent rce = new ResultContentEvent(inEvent.getInstanceIndex(), inEvent.getInstance(),
+//				inEvent.getClassId(), prediction, inEvent.isLastEvent());
+//		rce.setClassifierIndex(this.processorId);
+//		rce.setEvaluationIndex(inEvent.getEvaluationIndex());
+//		return rce;
+//	}
 			
 	private ResultContentEvent newResultContentEvent(double[] prediction, Instance inst, InstancesContentEvent inEvent){
 		ResultContentEvent rce = new ResultContentEvent(inEvent.getInstanceIndex(), inst, (int) inst.classValue(), prediction, inEvent.isLastEvent());
@@ -605,7 +609,7 @@ final class ModelAggregatorProcessor implements Processor {
 	
 	private LearningNode newLearningNode(double[] initialClassObservations, int parallelismHint){
 		//for VHT optimization, we need to dynamically instantiate the appropriate ActiveLearningNode
-		return new ActiveLearningNode(initialClassObservations, parallelismHint);
+		return new ActiveLearningNode(initialClassObservations, parallelismHint, this.splittingOption);
 	}
 		
 	/**
@@ -702,8 +706,9 @@ final class ModelAggregatorProcessor implements Processor {
 		private int gracePeriod = 200;
 		private int parallelismHint = 1;
 		private long timeOut = 30;
-		private ChangeDetector changeDetector = null;
-
+        private ChangeDetector changeDetector = null;
+        private SplittingOption splittingOption;
+                
 		Builder(Instances dataset){
 			this.dataset = dataset;
 		}
@@ -716,6 +721,7 @@ final class ModelAggregatorProcessor implements Processor {
 			this.gracePeriod = oldProcessor.gracePeriod;
 			this.parallelismHint = oldProcessor.parallelismHint;
 			this.timeOut = oldProcessor.timeOut;
+			this.splittingOption = oldProcessor.splittingOption;
 		}
 		
 		Builder splitCriterion(SplitCriterion splitCriterion){
@@ -748,13 +754,18 @@ final class ModelAggregatorProcessor implements Processor {
 			return this;
 		}
 		
-		Builder changeDetector(ChangeDetector changeDetector){
-			this.changeDetector = changeDetector;
-			return this;
-		}
+        Builder changeDetector(ChangeDetector changeDetector){
+            this.changeDetector = changeDetector;
+            return this;
+        }
+        
+        Builder splittingOption(SplittingOption splittingOption) {
+            this.splittingOption = splittingOption;
+            return this;
+        }
+         
 		ModelAggregatorProcessor build(){
 			return new ModelAggregatorProcessor(this);
 		}
 	}
-	
-}
+    }

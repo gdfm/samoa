@@ -46,25 +46,27 @@ final class ActiveLearningNode extends LearningNode {
 	
 	private final long id;
 	private final int parallelismHint;
+	private final SplittingOption splittingOption;
 	private int suggestionCtr;
 	private int thrownAwayInstance;
 	
 	private boolean isSplitting;
+
+    protected AttributeBatchContentEvent[] attributeBatchContentEvent;
 	
-	ActiveLearningNode(double[] classObservation, int parallelismHint) {
+	ActiveLearningNode(double[] classObservation, int parallelismHint, SplittingOption splitOption) {
 		super(classObservation);
 		this.weightSeenAtLastSplitEvaluation = this.getWeightSeen();
 		this.id = VerticalHoeffdingTree.LearningNodeIdGenerator.generate();
 		this.attributeContentEventKeys = new HashMap<>();
 		this.isSplitting = false;
 		this.parallelismHint = parallelismHint;
+		this.splittingOption = splitOption;
 	}
 	
 	long getId(){
 		return id;
 	}
-
-        protected AttributeBatchContentEvent[] attributeBatchContentEvent;
 
     public AttributeBatchContentEvent[] getAttributeBatchContentEvent() {
         return this.attributeBatchContentEvent;
@@ -76,10 +78,25 @@ final class ActiveLearningNode extends LearningNode {
         
 	@Override
     void learnFromInstance(Instance inst, ModelAggregatorProcessor proc) {
-        // TODO: what statistics should we keep for unused instance?
-        if (isSplitting) { // currently throw all instance will splitting
-            this.thrownAwayInstance++;
-            return;
+        if (isSplitting) {
+            switch (this.splittingOption) {
+            case THROW_AWAY:
+                logger.trace("node {} is splitting, throw away the instance",
+                        this.id); // throw all instance will splitting
+                this.thrownAwayInstance++;
+                return;
+            case KEEP_WO_BUFFER:
+                logger.trace("Keep instance without buffer, continue sending to local stats");
+                // do nothing here
+                break;
+            case KEEP_W_BUFFER:
+                // TODO: create the buffer
+                break;
+            default:
+                logger.error("Invalid splittingOption option: {}",
+                        this.splittingOption);
+                break;
+            }
         }
 
         this.observedClassDistribution.addToValue((int) inst.classValue(),
@@ -88,7 +105,7 @@ final class ActiveLearningNode extends LearningNode {
         // done: parallelize by sending attributes one by one
         // TODO: meanwhile, we can try to use the ThreadPool to execute it
         // separately
-        // TODO: parallelize by sending in batch, i.e. split the attributes into
+        // DONE: parallelize by sending in batch, i.e. split the attributes into
         // chunk instead of send the attribute one by one
         for (int i = 0; i < inst.numAttributes() - 1; i++) {
             int instAttIndex = modelAttIndexToInstanceAttIndex(i, inst);
@@ -207,4 +224,6 @@ final class ActiveLearningNode extends LearningNode {
 		result = prime * result + obsIndex;
 		return Integer.toString(result);
 	}
+	
+	static enum SplittingOption {THROW_AWAY, KEEP_WO_BUFFER, KEEP_W_BUFFER};
 }
