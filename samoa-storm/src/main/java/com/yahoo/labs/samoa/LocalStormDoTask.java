@@ -22,6 +22,7 @@ package com.yahoo.labs.samoa;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.concurrent.TimeUnit;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -69,8 +70,10 @@ public class LocalStormDoTask {
         backtype.storm.LocalCluster cluster = new backtype.storm.LocalCluster();
         cluster.submitTopology(topologyName, conf, stormTopo.getStormBuilder().createTopology());
 
-        backtype.storm.utils.Utils.sleep(600 * 1000);
-
+        long executionTime = 300;
+        logger.info("topology will run in {} seconds", executionTime);
+        backtype.storm.utils.Utils.sleep(TimeUnit.SECONDS.toMillis(300));
+        logger.info("topology will be killed now");
         cluster.killTopology(topologyName);
         cluster.shutdown();
 

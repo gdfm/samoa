@@ -22,7 +22,9 @@ package com.yahoo.labs.samoa.learners.classifiers.trees;
 
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Queue;
 
+import com.google.common.collect.EvictingQueue;
 import com.yahoo.labs.samoa.moa.classifiers.core.AttributeSplitSuggestion;
 
 import org.slf4j.Logger;
@@ -47,6 +49,8 @@ final class ActiveLearningNode extends LearningNode {
 	private final long id;
 	private final int parallelismHint;
 	private final SplittingOption splittingOption;
+	private final int maxBufferSize;
+	private final EvictingQueue<Instance> buffer;
 	private int suggestionCtr;
 	private int thrownAwayInstance;
 	
@@ -54,7 +58,7 @@ final class ActiveLearningNode extends LearningNode {
 
     protected AttributeBatchContentEvent[] attributeBatchContentEvent;
 	
-	ActiveLearningNode(double[] classObservation, int parallelismHint, SplittingOption splitOption) {
+	ActiveLearningNode(double[] classObservation, int parallelismHint, SplittingOption splitOption, int maxBufferSize) {
 		super(classObservation);
 		this.weightSeenAtLastSplitEvaluation = this.getWeightSeen();
 		this.id = VerticalHoeffdingTree.LearningNodeIdGenerator.generate();
@@ -62,6 +66,8 @@ final class ActiveLearningNode extends LearningNode {
 		this.isSplitting = false;
 		this.parallelismHint = parallelismHint;
 		this.splittingOption = splitOption;
+		this.maxBufferSize = maxBufferSize;
+		this.buffer = EvictingQueue.create(this.maxBufferSize);
 	}
 	
 	long getId(){
@@ -75,26 +81,30 @@ final class ActiveLearningNode extends LearningNode {
     public void setAttributeBatchContentEvent(AttributeBatchContentEvent[] attributeBatchContentEvent) {
         this.attributeBatchContentEvent = attributeBatchContentEvent;
     }
-        
+    
+    public Queue<Instance> getBuffer() {
+        return this.buffer;
+    }
+         
 	@Override
     void learnFromInstance(Instance inst, ModelAggregatorProcessor proc) {
+	    //log statement are commented since this method is potentially 
+	    //executed million times
         if (isSplitting) {
             switch (this.splittingOption) {
             case THROW_AWAY:
-                logger.trace("node {} is splitting, throw away the instance",
-                        this.id); // throw all instance will splitting
+                //logger.trace("node {}: splitting is happening, throw away the instance", this.id); // throw all instance will splitting
                 this.thrownAwayInstance++;
                 return;
-            case KEEP_WO_BUFFER:
-                logger.trace("Keep instance without buffer, continue sending to local stats");
-                // do nothing here
-                break;
-            case KEEP_W_BUFFER:
-                // TODO: create the buffer
+            case KEEP:
+                //logger.trace("node {}: keep instance with max buffer size: {}, continue sending to local stats", this.id, this.maxBufferSize);
+                if(this.maxBufferSize > 0) {
+                    //logger.trace("node {}: add to buffer", this.id);
+                    buffer.add(inst);
+                }
                 break;
             default:
-                logger.error("Invalid splittingOption option: {}",
-                        this.splittingOption);
+                logger.error("node {}: invalid splittingOption option: {}", this.id, this.splittingOption);
                 break;
             }
         }
@@ -197,8 +207,9 @@ final class ActiveLearningNode extends LearningNode {
 	
 	void endSplitting(){
 		this.isSplitting = false;
-		logger.debug("node: {}. end splitting, thrown away instance: {}", this.id, this.thrownAwayInstance);
+		logger.debug("node: {}. end splitting, thrown away instance: {}, buffer size: {}", this.id, this.thrownAwayInstance, this.buffer.size());
 		this.thrownAwayInstance = 0;
+		this.buffer.clear();
 	}
 	
 	AttributeSplitSuggestion getDistributedBestSuggestion(){
@@ -225,5 +236,5 @@ final class ActiveLearningNode extends LearningNode {
 		return Integer.toString(result);
 	}
 	
-	static enum SplittingOption {THROW_AWAY, KEEP_WO_BUFFER, KEEP_W_BUFFER};
+	static enum SplittingOption {THROW_AWAY, KEEP};
 }

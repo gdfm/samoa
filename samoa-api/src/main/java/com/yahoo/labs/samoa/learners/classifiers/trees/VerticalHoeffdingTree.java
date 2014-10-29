@@ -104,7 +104,12 @@ public final class VerticalHoeffdingTree implements ClassificationLearner, Adapt
     public FlagOption splittingOption = new FlagOption(
             "keepInstanceWhileSplitting",
             'k',
-            "Keep instance while splitting (without buffer)");
+            "Keep instance while splitting");
+    
+    public IntOption maxBufferSize = new IntOption("maxBufferSizeWhileSplitting",
+            'z',
+            "Maximum buffer size while splitting, use in conjuction with 'k' option. Size 0 means we don't use buffer while splitting",
+            0, 0, Integer.MAX_VALUE);
     
     //TODO: (possible)
     //1. memoryEstimatedOption => for estimating model sizes
@@ -150,7 +155,8 @@ public final class VerticalHoeffdingTree implements ClassificationLearner, Adapt
                 .parallelismHint(parallelismHintOption.getValue())
                 .timeOut(timeOutOption.getValue())
                 .changeDetector(this.getChangeDetector())
-                .splittingOption(splittingOption.isSet() ? SplittingOption.KEEP_WO_BUFFER: SplittingOption.THROW_AWAY)
+                .splittingOption(splittingOption.isSet() ? SplittingOption.KEEP: SplittingOption.THROW_AWAY)
+                .maxBufferSize(this.maxBufferSize.getValue())
                 .build();
         
         topologyBuilder.addProcessor(modelAggrProc, parallelism);

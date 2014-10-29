@@ -69,7 +69,7 @@ public class StormSamoaUtils {
 		for (String arg : args) {
 			cliString.append(" ").append(arg);
 		}
-		logger.debug("Command line string = {}", cliString.toString());
+		logger.info("Command line string = {}", cliString.toString());
 
 		Task task = getTask(cliString.toString());
 		

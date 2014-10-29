@@ -19,6 +19,9 @@ package com.yahoo.labs.samoa.learners.classifiers.trees;
  * limitations under the License.
  * #L%
  */
+
+import static com.yahoo.labs.samoa.moa.core.Utils.maxIndex;
+
 import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.List;
@@ -42,6 +45,7 @@ import com.yahoo.labs.samoa.core.Processor;
 import com.yahoo.labs.samoa.instances.Instance;
 import com.yahoo.labs.samoa.instances.Instances;
 import com.yahoo.labs.samoa.instances.InstancesHeader;
+import com.yahoo.labs.samoa.learners.InstanceContentEvent;
 import com.yahoo.labs.samoa.learners.InstancesContentEvent;
 import com.yahoo.labs.samoa.learners.ResultContentEvent;
 import com.yahoo.labs.samoa.learners.classifiers.trees.ActiveLearningNode.SplittingOption;
@@ -51,8 +55,6 @@ import com.yahoo.labs.samoa.moa.classifiers.core.splitcriteria.InfoGainSplitCrit
 import com.yahoo.labs.samoa.moa.classifiers.core.splitcriteria.SplitCriterion;
 import com.yahoo.labs.samoa.moa.core.MiscUtils;
 import com.yahoo.labs.samoa.topology.Stream;
-
-import static com.yahoo.labs.samoa.moa.core.Utils.maxIndex;
 
 /**
  * Model Aggegator Processor consists of the decision tree model. It connects 
@@ -104,6 +106,7 @@ final class ModelAggregatorProcessor implements Processor {
 	private final int parallelismHint;
 	private final long timeOut;
 	private final SplittingOption splittingOption;
+	private final int maxBufferSize;
 	
 	//private constructor based on Builder pattern
 	private ModelAggregatorProcessor(Builder builder){
@@ -116,6 +119,7 @@ final class ModelAggregatorProcessor implements Processor {
 		this.timeOut = builder.timeOut;
         this.changeDetector = builder.changeDetector;
         this.splittingOption = builder.splittingOption;
+        this.maxBufferSize = builder.maxBufferSize;
         
 		InstancesHeader ih = new InstancesHeader(dataset);
 		this.setModelContext(ih);
@@ -556,7 +560,7 @@ final class ModelAggregatorProcessor implements Processor {
 		if(shouldSplit){
 			if(bestSuggestion.splitTest == null){
 			    logger.debug("node: {}. split test is null! null attribute is winning", activeLearningNode.getId()); //shoud we deactivate here
-				// null attribute wins
+				// null attribute wins, TODO: VHT enhancement, deactivate learning node
 			}else{
 				SplitNode newSplit = new SplitNode(bestSuggestion.splitTest, activeLearningNode.getObservedClassDistribution());
 				
@@ -574,6 +578,16 @@ final class ModelAggregatorProcessor implements Processor {
 				}else{
 					parent.setChild(parentBranch, newSplit);
 				}
+				
+				//if keep w buffer
+				if(splittingOption == SplittingOption.KEEP && this.maxBufferSize > 0) {
+				    Queue<Instance> buffer = activeLearningNode.getBuffer();
+				    logger.debug("node: {}. split is happening, there are {} items in buffer", activeLearningNode.getId(), buffer.size());
+				    while(!buffer.isEmpty()) {
+				        this.trainOnInstanceImpl(buffer.poll());
+				    }
+				    logger.debug("node: {}. use all buffered instance for training. Buffer size: {}", activeLearningNode.getId(), buffer.size());
+				} 
 			}
 			//TODO: add check on the model's memory size 
 		} else {
@@ -609,7 +623,7 @@ final class ModelAggregatorProcessor implements Processor {
 	
 	private LearningNode newLearningNode(double[] initialClassObservations, int parallelismHint){
 		//for VHT optimization, we need to dynamically instantiate the appropriate ActiveLearningNode
-		return new ActiveLearningNode(initialClassObservations, parallelismHint, this.splittingOption);
+		return new ActiveLearningNode(initialClassObservations, parallelismHint, this.splittingOption, this.maxBufferSize);
 	}
 		
 	/**
@@ -707,7 +721,8 @@ final class ModelAggregatorProcessor implements Processor {
 		private int parallelismHint = 1;
 		private long timeOut = 30;
         private ChangeDetector changeDetector = null;
-        private SplittingOption splittingOption;
+        private SplittingOption splittingOption = SplittingOption.THROW_AWAY;
+        private int maxBufferSize = 1000;
                 
 		Builder(Instances dataset){
 			this.dataset = dataset;
@@ -761,6 +776,11 @@ final class ModelAggregatorProcessor implements Processor {
         
         Builder splittingOption(SplittingOption splittingOption) {
             this.splittingOption = splittingOption;
+            return this;
+        }
+        
+        Builder maxBufferSize(int maxBufferSize) {
+            this.maxBufferSize = maxBufferSize;
             return this;
         }
          
