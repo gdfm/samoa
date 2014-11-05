@@ -111,6 +111,11 @@ public final class VerticalHoeffdingTree implements ClassificationLearner, Adapt
             "Maximum buffer size while splitting, use in conjuction with 'k' option. Size 0 means we don't use buffer while splitting",
             0, 0, Integer.MAX_VALUE);
     
+    public FlagOption poissonOption = new FlagOption(
+            "usePoissonBasedWeightForBufferedInstanceAfterSplitting",
+            'w',
+            "Use Poisson-based weight for buffereed instance after splitting");
+    
     //TODO: (possible)
     //1. memoryEstimatedOption => for estimating model sizes
     //2. binarySplitsOption => for getting the best split suggestion, must be set in LocalStatisticsProcessor
@@ -155,7 +160,7 @@ public final class VerticalHoeffdingTree implements ClassificationLearner, Adapt
                 .parallelismHint(parallelismHintOption.getValue())
                 .timeOut(timeOutOption.getValue())
                 .changeDetector(this.getChangeDetector())
-                .splittingOption(splittingOption.isSet() ? SplittingOption.KEEP: SplittingOption.THROW_AWAY)
+                .splittingOption(splittingOption.isSet() ? (poissonOption.isSet() ? SplittingOption.POISSON : SplittingOption.KEEP) : SplittingOption.THROW_AWAY)
                 .maxBufferSize(this.maxBufferSize.getValue())
                 .build();
         

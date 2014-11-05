@@ -52,7 +52,7 @@ final class ActiveLearningNode extends LearningNode {
 	private final int maxBufferSize;
 	private final EvictingQueue<Instance> buffer;
 	private int suggestionCtr;
-	private int thrownAwayInstance;
+	private long seenInstanceWhileSplitting;
 	
 	private boolean isSplitting;
 
@@ -73,6 +73,10 @@ final class ActiveLearningNode extends LearningNode {
 	long getId(){
 		return id;
 	}
+	
+	long getSeenInstanceWhileSplitting() {
+	    return this.seenInstanceWhileSplitting;
+	}
 
     public AttributeBatchContentEvent[] getAttributeBatchContentEvent() {
         return this.attributeBatchContentEvent;
@@ -91,21 +95,23 @@ final class ActiveLearningNode extends LearningNode {
 	    //log statement are commented since this method is potentially 
 	    //executed million times
         if (isSplitting) {
+            this.seenInstanceWhileSplitting++;
             switch (this.splittingOption) {
-            case THROW_AWAY:
-                //logger.trace("node {}: splitting is happening, throw away the instance", this.id); // throw all instance will splitting
-                this.thrownAwayInstance++;
-                return;
-            case KEEP:
-                //logger.trace("node {}: keep instance with max buffer size: {}, continue sending to local stats", this.id, this.maxBufferSize);
-                if(this.maxBufferSize > 0) {
-                    //logger.trace("node {}: add to buffer", this.id);
-                    buffer.add(inst);
-                }
-                break;
-            default:
-                logger.error("node {}: invalid splittingOption option: {}", this.id, this.splittingOption);
-                break;
+                case THROW_AWAY:
+                    //logger.trace("node {}: splitting is happening, throw away the instance", this.id); // throw all instance will splitting
+                    //do nothing, just return from the function
+                    return;
+                case KEEP:
+                case POISSON:
+                    //logger.trace("node {}: keep instance with max buffer size: {}, continue sending to local stats", this.id, this.maxBufferSize);
+                    if(this.maxBufferSize > 0) {
+                        //logger.trace("node {}: add to buffer", this.id);
+                        buffer.add(inst);
+                    }
+                    break;
+                default:
+                    logger.error("node {}: invalid splittingOption option: {}", this.id, this.splittingOption);
+                    break;
             }
         }
 
@@ -170,7 +176,7 @@ final class ActiveLearningNode extends LearningNode {
 	    logger.debug("node: {}. start splitting", this.id);
 		this.isSplitting = true; 
 		this.suggestionCtr = 0;
-		this.thrownAwayInstance = 0;
+		this.seenInstanceWhileSplitting = 0;
 		
 		ComputeContentEvent cce = new ComputeContentEvent(splitId, this.id,
 				this.getObservedClassDistribution());
@@ -207,8 +213,7 @@ final class ActiveLearningNode extends LearningNode {
 	
 	void endSplitting(){
 		this.isSplitting = false;
-		logger.debug("node: {}. end splitting, thrown away instance: {}, buffer size: {}", this.id, this.thrownAwayInstance, this.buffer.size());
-		this.thrownAwayInstance = 0;
+		logger.debug("node: {}. end splitting, seen instance while splitting: {}, buffer size: {}", this.id, this.seenInstanceWhileSplitting, this.buffer.size());
 		this.buffer.clear();
 	}
 	
@@ -236,5 +241,5 @@ final class ActiveLearningNode extends LearningNode {
 		return Integer.toString(result);
 	}
 	
-	static enum SplittingOption {THROW_AWAY, KEEP};
+	static enum SplittingOption {THROW_AWAY, KEEP, POISSON};
 }
