@@ -57,7 +57,8 @@ import com.yahoo.labs.samoa.topology.TopologyBuilder;
 public final class VerticalHoeffdingTree implements ClassificationLearner, AdaptiveLearner, Configurable {
 
     private static final long serialVersionUID = -4937416312929984057L;
-
+    private static final Logger logger = LoggerFactory.getLogger(VerticalHoeffdingTree.class);
+    
     public ClassOption numericEstimatorOption = new ClassOption("numericEstimator",
             'n', "Numeric estimator to use.", NumericAttributeClassObserver.class,
             "GaussianNumericAttributeClassObserver");
@@ -151,7 +152,9 @@ public final class VerticalHoeffdingTree implements ClassificationLearner, Adapt
         this.filterStream = topologyBuilder.createStream(filterProc);
         this.filterProc.setOutputStream(this.filterStream);
          
- 
+        SplittingOption so = splittingOption.isSet() ? (poissonOption.isSet() ? SplittingOption.POISSON : SplittingOption.KEEP) : SplittingOption.THROW_AWAY;
+        logger.info("splitting option: {}", so);
+        
         this.modelAggrProc = new ModelAggregatorProcessor.Builder(dataset)
                 .splitCriterion((SplitCriterion) this.splitCriterionOption.getValue())
                 .splitConfidence(splitConfidenceOption.getValue())
@@ -163,6 +166,7 @@ public final class VerticalHoeffdingTree implements ClassificationLearner, Adapt
                 .splittingOption(splittingOption.isSet() ? (poissonOption.isSet() ? SplittingOption.POISSON : SplittingOption.KEEP) : SplittingOption.THROW_AWAY)
                 .maxBufferSize(this.maxBufferSize.getValue())
                 .build();
+        
         
         topologyBuilder.addProcessor(modelAggrProc, parallelism);
 

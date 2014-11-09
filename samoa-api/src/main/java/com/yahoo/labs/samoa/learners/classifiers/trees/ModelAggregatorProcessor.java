@@ -45,7 +45,6 @@ import com.yahoo.labs.samoa.core.Processor;
 import com.yahoo.labs.samoa.instances.Instance;
 import com.yahoo.labs.samoa.instances.Instances;
 import com.yahoo.labs.samoa.instances.InstancesHeader;
-import com.yahoo.labs.samoa.learners.InstanceContentEvent;
 import com.yahoo.labs.samoa.learners.InstancesContentEvent;
 import com.yahoo.labs.samoa.learners.ResultContentEvent;
 import com.yahoo.labs.samoa.learners.classifiers.trees.ActiveLearningNode.SplittingOption;
@@ -146,29 +145,30 @@ final class ModelAggregatorProcessor implements Processor {
 		//Receive a new instance from source
 		if(event instanceof InstancesContentEvent){
 			InstancesContentEvent instancesEvent = (InstancesContentEvent) event;
-			this.processInstanceContentEvent(instancesEvent);
-                        //Send information to local-statistic PI
-                        //for each of the nodes
-                        if (this.foundNodeSet != null){
-                            for (FoundNode foundNode: this.foundNodeSet ){
-                                ActiveLearningNode leafNode = (ActiveLearningNode) foundNode.getNode();
-                                AttributeBatchContentEvent[] abce = leafNode.getAttributeBatchContentEvent();
-                                if (abce != null) {
-                                    for (int i = 0; i< this.dataset.numAttributes() - 1; i++) {
-                                        this.sendToAttributeStream(abce[i]);
-                                    }
-                                }
-                                leafNode.setAttributeBatchContentEvent(null);
-                            //this.sendToControlStream(event); //split information
-                            //See if we can ask for splits
-                                if(!leafNode.isSplitting()){
-                                    double weightSeen = leafNode.getWeightSeen();
-                                    //check whether it is the time for splitting
-                                    if(weightSeen - leafNode.getWeightSeenAtLastSplitEvaluation() >= this.gracePeriod){
-                                            attemptToSplit(leafNode, foundNode);
-                                    } 
-                                }
-                            }
+//			this.processInstanceContentEvent(instancesEvent);
+			this.processInstances(instancesEvent);
+            //Send information to local-statistic PI
+            //for each of the nodes
+            if (this.foundNodeSet != null){
+                for (FoundNode foundNode: this.foundNodeSet ){
+                    ActiveLearningNode leafNode = (ActiveLearningNode) foundNode.getNode();
+                    AttributeBatchContentEvent[] abce = leafNode.getAttributeBatchContentEvent();
+                    if (abce != null) {
+                        for (int i = 0; i< this.dataset.numAttributes() - 1; i++) {
+                            this.sendToAttributeStream(abce[i]);
+                        }
+                    }
+                    leafNode.setAttributeBatchContentEvent(null);
+                    //this.sendToControlStream(event); //split information
+                    //See if we can ask for splits
+                    if(leafNode.isSplitting() == false){ 
+                        double weightSeen = leafNode.getWeightSeen();
+                        //check whether it is the time for splitting
+                        if(weightSeen - leafNode.getWeightSeenAtLastSplitEvaluation() >= this.gracePeriod){
+                                attemptToSplit(leafNode, foundNode);
+                        } 
+                    }
+                }
             }
             this.foundNodeSet = null;
 		} else if(event instanceof LocalResultContentEvent){
@@ -271,46 +271,32 @@ final class ModelAggregatorProcessor implements Processor {
 	 * @param inEvent The associated instance content event
 	 * @return ResultContentEvent to be sent into Evaluator PI or other destination PI.
 	 */
-//	private ResultContentEvent newResultContentEvent(double[] prediction, InstanceContentEvent inEvent){
-//		ResultContentEvent rce = new ResultContentEvent(inEvent.getInstanceIndex(), inEvent.getInstance(),
-//				inEvent.getClassId(), prediction, inEvent.isLastEvent());
-//		rce.setClassifierIndex(this.processorId);
-//		rce.setEvaluationIndex(inEvent.getEvaluationIndex());
-//		return rce;
-//	}
-			
-	private ResultContentEvent newResultContentEvent(double[] prediction, Instance inst, InstancesContentEvent inEvent){
+    private ResultContentEvent newResultContentEvent(double[] prediction, Instance inst, InstancesContentEvent inEvent){
 		ResultContentEvent rce = new ResultContentEvent(inEvent.getInstanceIndex(), inst, (int) inst.classValue(), prediction, inEvent.isLastEvent());
 		rce.setClassifierIndex(this.processorId);
 		rce.setEvaluationIndex(inEvent.getEvaluationIndex());
 		return rce;
 	}
 			
-	private List<InstancesContentEvent> contentEventList = new LinkedList<>();
+//        private List<InstancesContentEvent> contentEventList = new LinkedList<InstancesContentEvent>();
 
         
-    /**
-     * Helper method to process the InstanceContentEvent
-     * 
-     * @param instContentEvent
-     */
-    private void processInstanceContentEvent(
-            InstancesContentEvent instContentEvent) {
-        this.numBatches++;
-//        logger.debug("Num batches: {}", numBatches);
-        this.contentEventList.add(instContentEvent);
-        if (this.numBatches == 1 || this.numBatches > 4) {
-            this.processInstances(this.contentEventList.remove(0));
-        }
-            if (instContentEvent.isLastEvent()) {
-                // drain remaining instances
-                while (!contentEventList.isEmpty()) {
-                    processInstances(contentEventList.remove(0));
-                }
-            }
-    }
+//    /**
+//     * Helper method to process the InstanceContentEvent
+//     * 
+//     * @param instContentEvent
+//     */
+//    private void processInstanceContentEvent(
+//            InstancesContentEvent instContentEvent) {
+//        this.numBatches++;
+////        logger.debug("Num batches: {}", numBatches);
+//        this.contentEventList.add(instContentEvent);
+//        if (this.numBatches == 1 || this.numBatches > 4) {
+//            this.processInstances(this.contentEventList.remove(0));
+//        }
+//    }
 
-    private int numBatches = 0;
+//    private int numBatches = 0;
 
     private void processInstances(InstancesContentEvent instContentEvent) {
 
@@ -585,10 +571,15 @@ final class ModelAggregatorProcessor implements Processor {
 				//if not throw away
 				if(splittingOption != SplittingOption.THROW_AWAY && this.maxBufferSize > 0) {
 				    Queue<Instance> buffer = activeLearningNode.getBuffer();
-				    int bufferSize = buffer.size();
-				    long seenInstancesWhileSplitting = activeLearningNode.getSeenInstanceWhileSplitting();
-				    double ratio = seenInstancesWhileSplitting/(double)bufferSize;
-				    logger.debug("node: {}. split is happening, there are {} items in buffer, ratio: {}", activeLearningNode.getId(), bufferSize, ratio);
+				    double ratio = 1;
+				    if(!buffer.isEmpty()) {
+    				    int bufferSize = buffer.size();
+    				    long seenInstancesWhileSplitting = activeLearningNode.getSeenInstanceWhileSplitting();
+    				    ratio = seenInstancesWhileSplitting/(double)bufferSize;
+                        logger.debug("node: {}. split is happening, seen instance: {}, there are {} items in buffer, ratio: {}", 
+                                activeLearningNode.getId(), seenInstancesWhileSplitting, bufferSize, ratio);
+    				}
+				    
 				    while(!buffer.isEmpty()) {
 				        Instance trainInst = buffer.poll();
 				        switch(splittingOption) {
@@ -613,6 +604,7 @@ final class ModelAggregatorProcessor implements Processor {
 			}
 			//TODO: add check on the model's memory size 
 		} else {
+		    //if not splitting, do nothing at the moment.
 		}
 		
 		//housekeeping
@@ -626,6 +618,7 @@ final class ModelAggregatorProcessor implements Processor {
 	 * @param parent Parent of the soon-to-be-deactivated Active LearningNode
 	 * @param parentBranch the branch index of the node in the parent node
 	 */
+	//TODO: use this method
 	private void deactivateLearningNode(ActiveLearningNode toDeactivate, SplitNode parent, int parentBranch){
 		Node newLeaf = new InactiveLearningNode(toDeactivate.getObservedClassDistribution());
 		if(parent == null){
