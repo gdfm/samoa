@@ -58,7 +58,7 @@
   </appender>
 
   <category name="com.yahoo.labs" additivity="false">
-     <priority value="info"/>
+     <priority value="debug"/>
      <appender-ref ref="CONSOLE"/>
      <appender-ref ref="RollingAppender"/>
   </category>
