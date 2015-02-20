@@ -210,7 +210,7 @@ final class ActiveLearningNode extends LearningNode {
 	boolean isSplitting(){
 		return this.isSplitting;
 	}
-	
+	   
 	void endSplitting(){
 		this.isSplitting = false;
 		logger.debug("node: {}. end splitting, seen instance while splitting: {}, buffer size: {}", this.id, this.seenInstanceWhileSplitting, this.buffer.size());

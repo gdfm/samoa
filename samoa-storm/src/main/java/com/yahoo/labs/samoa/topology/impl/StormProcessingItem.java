@@ -53,7 +53,7 @@ class StormProcessingItem extends AbstractProcessingItem implements StormTopolog
 	
 	//TODO: should we put parallelism hint here? 
 	//imo, parallelism hint only declared when we add this PI in the topology
-	//open for dicussion :p
+	//open for dicussion
 		
 	StormProcessingItem(Processor processor, int parallelismHint){
 		this(processor, UUID.randomUUID().toString(), parallelismHint);
@@ -139,8 +139,8 @@ class StormProcessingItem extends AbstractProcessingItem implements StormTopolog
 			for(StormBoltStream stream: streams){
 				stream.setCollector(this.collector);
 			}
-			
-			this.processor.onCreate(context.getThisTaskId());
+						
+			this.processor.onCreate(context.getThisTaskIndex());
 		}
 
 		@Override

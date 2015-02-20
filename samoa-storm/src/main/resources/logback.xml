@@ -51,7 +51,7 @@
   </appender>
 
 
-  <logger name="com.yahoo.labs.samoa" level="debug" />
+  <logger name="com.yahoo.labs.samoa" level="info" />
 
   <root level="warn">
     <appender-ref ref="STDOUT"/>

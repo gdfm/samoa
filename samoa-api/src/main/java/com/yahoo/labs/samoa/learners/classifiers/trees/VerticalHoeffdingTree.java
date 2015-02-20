@@ -92,6 +92,11 @@ public final class VerticalHoeffdingTree implements ClassificationLearner, Adapt
             'p',
             "The number of local statistics PI to do distributed computation",
             1, 1, Integer.MAX_VALUE);
+    
+    public IntOption modelParallelismHintOption = new IntOption("modelParallelismHint",
+            'm',
+            "The number of model aggregation processor for model replication", 
+            1,1, Integer.MAX_VALUE);
 
     public IntOption timeOutOption = new IntOption(
             "timeOut",
@@ -123,44 +128,31 @@ public final class VerticalHoeffdingTree implements ClassificationLearner, Adapt
     //3. stopMemManagementOption => for enforcing tracker limit, no tracker limit enforcement atm
     //4. removePoorAttsOption => no poor attributes remove at the moment
     //5. noPrePruneOption => always add null split as an option now
-    private ModelAggregatorProcessor modelAggrProc;
-
     private Stream resultStream;
-
-    private Stream attributeStream;
-
-    private Stream controlStream;
-
-    private LocalStatisticsProcessor locStatProc;
 
     private FilterProcessor filterProc;
     
-    private Stream filterStream;
     
-    private Stream computeStream;
-    
-//    private int parallelism;
-
     @Override
     public void init(TopologyBuilder topologyBuilder, Instances dataset, int parallelism) {
-//        this.parallelism = parallelism;
-        
+
         this.filterProc = new FilterProcessor.Builder(dataset)
                 .build();
         topologyBuilder.addProcessor(filterProc, parallelism);
         
-        this.filterStream = topologyBuilder.createStream(filterProc);
-        this.filterProc.setOutputStream(this.filterStream);
+        Stream filterStream = topologyBuilder.createStream(filterProc);
+        this.filterProc.setOutputStream(filterStream);
          
         SplittingOption so = splittingOption.isSet() ? (poissonOption.isSet() ? SplittingOption.POISSON : SplittingOption.KEEP) : SplittingOption.THROW_AWAY;
         logger.info("splitting option: {}", so);
         
-        this.modelAggrProc = new ModelAggregatorProcessor.Builder(dataset)
+        ModelAggregatorProcessor modelAggrProc = new ModelAggregatorProcessor.Builder(dataset)
                 .splitCriterion((SplitCriterion) this.splitCriterionOption.getValue())
                 .splitConfidence(splitConfidenceOption.getValue())
                 .tieThreshold(tieThresholdOption.getValue())
                 .gracePeriod(gracePeriodOption.getValue())
                 .parallelismHint(parallelismHintOption.getValue())
+                .modelParallelismHint(modelParallelismHintOption.getValue())
                 .timeOut(timeOutOption.getValue())
                 .changeDetector(this.getChangeDetector())
                 .splittingOption(splittingOption.isSet() ? (poissonOption.isSet() ? SplittingOption.POISSON : SplittingOption.KEEP) : SplittingOption.THROW_AWAY)
@@ -170,32 +162,32 @@ public final class VerticalHoeffdingTree implements ClassificationLearner, Adapt
         
         topologyBuilder.addProcessor(modelAggrProc, parallelism);
 
-    topologyBuilder.connectInputShuffleStream(filterStream, modelAggrProc);
-
-    this.resultStream = topologyBuilder.createStream(modelAggrProc);
-    modelAggrProc.setResultStream(resultStream);
-
-    Stream attributeStream = topologyBuilder.createStream(modelAggrProc);
-    modelAggrProc.setAttributeStream(attributeStream);
-
-    Stream controlStream = topologyBuilder.createStream(modelAggrProc);
-    modelAggrProc.setControlStream(controlStream);
-
-    LocalStatisticsProcessor locStatProc = new LocalStatisticsProcessor.Builder()
-        .splitCriterion((SplitCriterion) this.splitCriterionOption.getValue())
-        .binarySplit(binarySplitsOption.isSet())
-        .nominalClassObserver((AttributeClassObserver) this.nominalEstimatorOption.getValue())
-        .numericClassObserver((AttributeClassObserver) this.numericEstimatorOption.getValue())
-        .build();
-
-    topologyBuilder.addProcessor(locStatProc, parallelismHintOption.getValue());
-    topologyBuilder.connectInputKeyStream(attributeStream, locStatProc);
-    topologyBuilder.connectInputAllStream(controlStream, locStatProc);
-
-    Stream computeStream = topologyBuilder.createStream(locStatProc);
-
-    locStatProc.setComputationResultStream(computeStream);
-    topologyBuilder.connectInputAllStream(computeStream, modelAggrProc);
+        topologyBuilder.connectInputShuffleStream(filterStream, modelAggrProc);
+    
+        this.resultStream = topologyBuilder.createStream(modelAggrProc);
+        modelAggrProc.setResultStream(resultStream);
+    
+        Stream attributeStream = topologyBuilder.createStream(modelAggrProc);
+        modelAggrProc.setAttributeStream(attributeStream);
+    
+        Stream controlStream = topologyBuilder.createStream(modelAggrProc);
+        modelAggrProc.setControlStream(controlStream);
+    
+        LocalStatisticsProcessor locStatProc = new LocalStatisticsProcessor.Builder()
+            .splitCriterion((SplitCriterion) this.splitCriterionOption.getValue())
+            .binarySplit(binarySplitsOption.isSet())
+            .nominalClassObserver((AttributeClassObserver) this.nominalEstimatorOption.getValue())
+            .numericClassObserver((AttributeClassObserver) this.numericEstimatorOption.getValue())
+            .build();
+    
+        topologyBuilder.addProcessor(locStatProc, parallelismHintOption.getValue());
+        topologyBuilder.connectInputKeyStream(attributeStream, locStatProc);
+        topologyBuilder.connectInputAllStream(controlStream, locStatProc);
+    
+        Stream computeStream = topologyBuilder.createStream(locStatProc);
+    
+        locStatProc.setComputationResultStream(computeStream);
+        topologyBuilder.connectInputAllStream(computeStream, modelAggrProc);
   }
 
   @Override

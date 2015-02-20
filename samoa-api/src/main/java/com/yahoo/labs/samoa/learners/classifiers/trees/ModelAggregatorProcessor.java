@@ -104,6 +104,7 @@ final class ModelAggregatorProcessor implements Processor {
 	private final double tieThreshold;
 	private final int gracePeriod;
 	private final int parallelismHint;
+	private final int modelParallelismHint;
 	private final long timeOut;
 	private final SplittingOption splittingOption;
 	private final int maxBufferSize;
@@ -116,6 +117,7 @@ final class ModelAggregatorProcessor implements Processor {
 		this.tieThreshold = builder.tieThreshold;
 		this.gracePeriod = builder.gracePeriod;
 		this.parallelismHint = builder.parallelismHint;
+		this.modelParallelismHint = builder.modelParallelismHint;
 		this.timeOut = builder.timeOut;
         this.changeDetector = builder.changeDetector;
         this.splittingOption = builder.splittingOption;
@@ -139,7 +141,6 @@ final class ModelAggregatorProcessor implements Processor {
 				this.continueAttemptToSplit(splittingNode.activeLearningNode,
 						splittingNode.foundNode);
 			}
-
 		}
 		
 		//Receive a new instance from source
@@ -159,13 +160,15 @@ final class ModelAggregatorProcessor implements Processor {
                         }
                     }
                     leafNode.setAttributeBatchContentEvent(null);
-                    //this.sendToControlStream(event); //split information
+                    //this.sendToControlStream(event); //split information 
                     //See if we can ask for splits
-                    if(leafNode.isSplitting() == false){ 
+                    //TODO: based on processor ID, we decide which processor 
+                    //will send the control message to start the splitting process.
+                    if(this.processorId == 0 && leafNode.isSplitting() == false){ 
                         double weightSeen = leafNode.getWeightSeen();
                         //check whether it is the time for splitting
                         if(weightSeen - leafNode.getWeightSeenAtLastSplitEvaluation() >= this.gracePeriod){
-                                attemptToSplit(leafNode, foundNode);
+                            attemptToSplit(leafNode, foundNode);
                         } 
                     }
                 }
@@ -206,6 +209,8 @@ final class ModelAggregatorProcessor implements Processor {
 	@Override
 	public void onCreate(int id) {
 		this.processorId = id;
+		
+		logger.debug("procID: {}", id);
 		
 		this.activeLeafNodeCount = 0;
 		this.inactiveLeafNodeCount = 0;
@@ -740,6 +745,7 @@ final class ModelAggregatorProcessor implements Processor {
 		private double tieThreshold = 0.05;
 		private int gracePeriod = 200;
 		private int parallelismHint = 1;
+		private int modelParallelismHint = 1;
 		private long timeOut = 30;
         private ChangeDetector changeDetector = null;
         private SplittingOption splittingOption = SplittingOption.THROW_AWAY;
@@ -756,6 +762,7 @@ final class ModelAggregatorProcessor implements Processor {
 			this.tieThreshold = oldProcessor.tieThreshold;
 			this.gracePeriod = oldProcessor.gracePeriod;
 			this.parallelismHint = oldProcessor.parallelismHint;
+			this.modelParallelismHint = oldProcessor.modelParallelismHint;
 			this.timeOut = oldProcessor.timeOut;
 			this.splittingOption = oldProcessor.splittingOption;
 		}
@@ -783,6 +790,11 @@ final class ModelAggregatorProcessor implements Processor {
 		Builder parallelismHint(int parallelismHint){
 			this.parallelismHint = parallelismHint;
 			return this;
+		}
+		
+		Builder modelParallelismHint(int modelParallelismHint){
+		    this.modelParallelismHint = modelParallelismHint;
+		    return this;
 		}
 		
 		Builder timeOut(long timeOut){
