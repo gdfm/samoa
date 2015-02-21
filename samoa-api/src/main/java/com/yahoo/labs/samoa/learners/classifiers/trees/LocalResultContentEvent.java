@@ -37,17 +37,20 @@ final class LocalResultContentEvent implements ContentEvent{
 	private final AttributeSplitSuggestion bestSuggestion;
 	private final AttributeSplitSuggestion secondBestSuggestion;
 	private final long splitId;
+	private final double maxWeightSeen;
 	
 	public LocalResultContentEvent(){
 		bestSuggestion = null;
 		secondBestSuggestion = null;
 		splitId = -1;
+		maxWeightSeen = 0;
 	}
 	
-	LocalResultContentEvent(long splitId, AttributeSplitSuggestion best, AttributeSplitSuggestion secondBest){
+	LocalResultContentEvent(long splitId, AttributeSplitSuggestion best, AttributeSplitSuggestion secondBest, double maxWeightSeen){
 		this.splitId = splitId;
 		this.bestSuggestion = best;
 		this.secondBestSuggestion = secondBest;
+		this.maxWeightSeen = maxWeightSeen;
 	}
 	
 	@Override
@@ -77,6 +80,15 @@ final class LocalResultContentEvent implements ContentEvent{
 	 */
 	long getSplitId(){
 		return this.splitId;
+	}
+	
+	
+	/**
+	 * Method to get the maximum weight seen when VHT executes with model replication
+	 * @return
+	 */
+	double getMaxWeightSeen() {
+	    return this.maxWeightSeen;
 	}
 
 	@Override

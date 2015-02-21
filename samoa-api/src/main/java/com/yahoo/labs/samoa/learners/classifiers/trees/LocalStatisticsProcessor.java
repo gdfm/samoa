@@ -21,6 +21,8 @@ package com.yahoo.labs.samoa.learners.classifiers.trees;
  */
 
 import java.util.Arrays;
+import java.util.Collection;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
@@ -29,18 +31,16 @@ import java.util.Vector;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.google.common.collect.HashBasedTable;
+import com.google.common.collect.Table;
+import com.yahoo.labs.samoa.core.ContentEvent;
+import com.yahoo.labs.samoa.core.Processor;
 import com.yahoo.labs.samoa.moa.classifiers.core.AttributeSplitSuggestion;
 import com.yahoo.labs.samoa.moa.classifiers.core.attributeclassobservers.AttributeClassObserver;
 import com.yahoo.labs.samoa.moa.classifiers.core.attributeclassobservers.GaussianNumericAttributeClassObserver;
 import com.yahoo.labs.samoa.moa.classifiers.core.attributeclassobservers.NominalAttributeClassObserver;
 import com.yahoo.labs.samoa.moa.classifiers.core.splitcriteria.InfoGainSplitCriterion;
 import com.yahoo.labs.samoa.moa.classifiers.core.splitcriteria.SplitCriterion;
-
-import com.google.common.collect.HashBasedTable;
-import com.google.common.collect.Table;
-
-import com.yahoo.labs.samoa.core.ContentEvent;
-import com.yahoo.labs.samoa.core.Processor;
 import com.yahoo.labs.samoa.topology.Stream;
 
 /**
@@ -58,6 +58,7 @@ final class LocalStatisticsProcessor implements Processor {
 	
 	//Collection of AttributeObservers, for each ActiveLearningNode and AttributeId
     private Table<Long, Integer, AttributeClassObserver> localStats;
+    private Table<Long, Integer, Double> weightTrackers;
     
     private Stream computationResultStream;
     
@@ -77,25 +78,33 @@ final class LocalStatisticsProcessor implements Processor {
 	@Override
 	public boolean process(ContentEvent event) {
 		//process AttributeContentEvent by updating the subset of local statistics
-                if (event instanceof AttributeBatchContentEvent) {
-                        AttributeBatchContentEvent abce = (AttributeBatchContentEvent) event;
-                        List<ContentEvent> contentEventList = abce.getContentEventList();
-                            for (ContentEvent contentEvent: contentEventList ){
-                            AttributeContentEvent ace = (AttributeContentEvent) contentEvent;
-                            Long learningNodeId = ace.getLearningNodeId();
-                            Integer obsIndex = ace.getObsIndex();
-
-                            AttributeClassObserver obs = localStats.get(
-                                            learningNodeId, obsIndex);
-
-                            if (obs == null) {
-                                    obs = ace.isNominal() ? newNominalClassObserver()
-                                                    : newNumericClassObserver();
-                                    localStats.put(ace.getLearningNodeId(), obsIndex, obs);
-                            }
-                            obs.observeAttributeClass(ace.getAttrVal(), ace.getClassVal(),
-                                            ace.getWeight());
-                            }
+        if (event instanceof AttributeBatchContentEvent) {
+            AttributeBatchContentEvent abce = (AttributeBatchContentEvent) event;
+            List<ContentEvent> contentEventList = abce.getContentEventList();
+                for (ContentEvent contentEvent: contentEventList ){
+                    AttributeContentEvent ace = (AttributeContentEvent) contentEvent;
+                    Long learningNodeId = ace.getLearningNodeId();
+                    Integer obsIndex = ace.getObsIndex();
+    
+                    AttributeClassObserver obs = localStats.get(
+                                    learningNodeId, obsIndex);
+    
+                    if (obs == null) {
+                        obs = ace.isNominal() ? newNominalClassObserver() : newNumericClassObserver();
+                        localStats.put(ace.getLearningNodeId(), obsIndex, obs);
+                    }
+                        
+                    obs.observeAttributeClass(ace.getAttrVal(), ace.getClassVal(),
+                                    ace.getWeight());
+                    
+                    Double currentWeight = weightTrackers.get(learningNodeId, obsIndex);
+                    if(currentWeight == null) {
+                        currentWeight = Double.valueOf(0.0);
+                    }
+                    
+                    currentWeight += ace.getWeight();
+                    weightTrackers.put(learningNodeId, obsIndex, currentWeight);
+            }
 			
 		
             /*if (event instanceof AttributeContentEvent) {
@@ -151,15 +160,24 @@ final class LocalStatisticsProcessor implements Processor {
 				}
 			}
 			
+			Map<Integer, Double> weightTrackerRowMap = weightTrackers.row(learningNodeId);
+			Collection<Double> weights = weightTrackerRowMap.values();
+			Double maxWeight = Collections.max(weights);
+
+			//clear the tracker after we find the max weight
+			weightTrackerRowMap.clear();
+			
 			//create the local result content event
 			LocalResultContentEvent lcre = 
-					new LocalResultContentEvent(cce.getSplitId(), bestSuggestion, secondBestSuggestion);
+					new LocalResultContentEvent(cce.getSplitId(), bestSuggestion, secondBestSuggestion, maxWeight.doubleValue());
+			
 			computationResultStream.put(lcre);
 			logger.debug("Finish compute event");
 		} else if (event instanceof DeleteContentEvent) {
 			DeleteContentEvent dce = (DeleteContentEvent) event;
 			Long learningNodeId = dce.getLearningNodeId();
 			localStats.rowMap().remove(learningNodeId);
+			weightTrackers.rowMap().remove(learningNodeId);
 		}
 		return false;
 	}
@@ -167,6 +185,7 @@ final class LocalStatisticsProcessor implements Processor {
 	@Override
 	public void onCreate(int id) {
 		this.localStats = HashBasedTable.create();
+		this.weightTrackers = HashBasedTable.create();
 	}
 
 	@Override
