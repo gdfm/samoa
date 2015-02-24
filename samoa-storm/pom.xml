@@ -56,17 +56,17 @@
         </dependency>
 
         <dependency>
-            <groupId>storm</groupId>
-            <artifactId>storm</artifactId>
+            <groupId>org.apache.storm</groupId>
+            <artifactId>storm-core</artifactId>
             <version>${storm.version}</version>
             <scope>provided</scope>
         </dependency>
-        <dependency>
+        <!--dependency>
             <groupId>org.apache.zookeeper</groupId>
             <artifactId>zookeeper</artifactId>
             <version>${zookeeper.storm.version}</version>
             <scope>provided</scope>
-        </dependency>
+        </dependency-->
         <dependency>
             <groupId>org.slf4j</groupId>
             <artifactId>slf4j-log4j12</artifactId>

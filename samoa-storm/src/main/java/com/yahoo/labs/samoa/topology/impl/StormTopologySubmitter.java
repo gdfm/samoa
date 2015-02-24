@@ -30,6 +30,7 @@ import java.util.Map;
 import java.util.Properties;
 
 import org.apache.thrift7.TException;
+import org.apache.thrift7.transport.TTransportException;
 import org.json.simple.JSONValue;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -52,7 +53,7 @@ public class StormTopologySubmitter {
 	
 	private static Logger logger = LoggerFactory.getLogger(StormTopologySubmitter.class);
 		
-	public static void main(String[] args) throws IOException{
+	public static void main(String[] args) throws IOException, TTransportException {
 		Properties props = StormSamoaUtils.getProperties();
 		
 		String uploadedJarLocation = props.getProperty(StormJarSubmitter.UPLOADED_JAR_LOCATION_KEY);
@@ -102,8 +103,9 @@ public class StormTopologySubmitter {
 		config.putAll(Utils.readStormConfig());
 		
 		String nimbusHost = (String) config.get(Config.NIMBUS_HOST);
+		int nimbusPort = Utils.getInt(config.get(Config.NIMBUS_THRIFT_PORT));
 				
-		NimbusClient nc = new NimbusClient(nimbusHost);
+		NimbusClient nc = new NimbusClient(config, nimbusHost, nimbusPort);
 		String topologyName = stormTopo.getTopologyName();
 		try {
 			System.out.println("Submitting topology with name: " 
