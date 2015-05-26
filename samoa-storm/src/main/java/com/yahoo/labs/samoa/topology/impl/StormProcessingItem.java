@@ -148,6 +148,7 @@ class StormProcessingItem extends AbstractProcessingItem implements StormTopolog
 			Object sentObject = input.getValue(0);
 			ContentEvent sentEvent = (ContentEvent)sentObject;
 			processor.process(sentEvent);
+			collector.ack(input);
 		}
 
 		@Override

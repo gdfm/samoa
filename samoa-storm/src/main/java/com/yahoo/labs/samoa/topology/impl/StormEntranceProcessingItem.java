@@ -22,6 +22,12 @@ package com.yahoo.labs.samoa.topology.impl;
 
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import backtype.storm.spout.SpoutOutputCollector;
 import backtype.storm.task.TopologyContext;
@@ -41,6 +47,8 @@ import com.yahoo.labs.samoa.topology.Stream;
  * EntranceProcessingItem implementation for Storm.
  */
 class StormEntranceProcessingItem extends AbstractEntranceProcessingItem implements StormTopologyNode {
+    private static final Logger LOG = LoggerFactory.getLogger(StormEntranceProcessingItem.class);
+
     private final StormEntranceSpout piSpout;
 
     StormEntranceProcessingItem(EntranceProcessor processor) {
@@ -93,10 +101,12 @@ class StormEntranceProcessingItem extends AbstractEntranceProcessingItem impleme
     final static class StormEntranceSpout extends BaseRichSpout {
 
         private static final long serialVersionUID = -9066409791668954099L;
+        private static final Object anchor = new Object();
 
         // private final Set<StormSpoutStream> streams;
         private final EntranceProcessor entranceProcessor;
         private StormStream outputStream;
+        private int acked, failed;
 
         // private transient SpoutStarter spoutStarter;
         // private transient Executor spoutExecutors;
@@ -139,7 +149,7 @@ class StormEntranceProcessingItem extends AbstractEntranceProcessingItem impleme
         public void nextTuple() {
             if (entranceProcessor.hasNext()) {
                 Values value = newValues(entranceProcessor.nextEvent());
-                collector.emit(outputStream.getOutputId(), value);
+                collector.emit(outputStream.getOutputId(), value, anchor);
             } else
                 Utils.sleep(1000);
             // StormTupleInfo tupleInfo = tupleInfoQueue.poll(50, TimeUnit.MILLISECONDS);
@@ -147,6 +157,40 @@ class StormEntranceProcessingItem extends AbstractEntranceProcessingItem impleme
             // Values value = newValues(tupleInfo.getContentEvent());
             // collector.emit(tupleInfo.getStormStream().getOutputId(), value);
             // }
+        }
+
+        @Override
+        public void activate() {
+          super.activate();
+          final ScheduledExecutorService executorService = Executors.newScheduledThreadPool(1);
+          Runnable helloRunnable = new Runnable() {
+            public void run() {
+              report();
+            }
+          };
+          executorService.scheduleAtFixedRate(helloRunnable, 0, 3, TimeUnit.SECONDS);
+        }
+
+        @Override
+        public void ack(Object msgId) {
+          super.ack(msgId);
+          acked++;
+        }
+
+        @Override
+        public void fail(Object msgId) {
+          super.fail(msgId);
+          failed++;
+        }
+        
+        public void report() {
+          LOG.info("ACKED {} \t FAILED {}", acked, failed);
+        }
+
+        @Override
+        public void close() {
+          super.close();
+          report();
         }
 
         @Override
